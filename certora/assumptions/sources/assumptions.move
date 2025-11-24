@@ -19,7 +19,7 @@ public fun cvlm_manifest() {
 native fun ls_get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64;
 native fun ss_get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64;
 
-// The main spec's summaries assume that liquid_staking::storage::get_sui_amount is equivalent to
+// The main suilend spec's summaries assume that liquid_staking::storage::get_sui_amount is equivalent to
 // sui_system::staking_pool::get_sui_amount.  We validate that assumption here.
 public fun get_sui_amount_equivalence(
     exchange_rate: &PoolTokenExchangeRate,
