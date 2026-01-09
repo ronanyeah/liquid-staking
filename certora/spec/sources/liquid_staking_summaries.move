@@ -11,4 +11,5 @@ public fun cvlm_manifest() {
 // This is validated in the "assumptions" spec
 public fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
     spec::sui_system_summaries::get_sui_amount(exchange_rate, token_amount)
+    // (exchange_rate.sui_amount() * token_amount) / exchange_rate.pool_token_amount()
 }
