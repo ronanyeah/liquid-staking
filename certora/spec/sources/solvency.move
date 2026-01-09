@@ -94,6 +94,8 @@ public fun solvency_step(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
+    cvlm_assume_msg(lsi.storage().validators().length() == 1, b"Only one validator");
+
     cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Refresh");
     lsi.refresh(system_state, ctx);
     //lsi.fee_config().validate_fees();
