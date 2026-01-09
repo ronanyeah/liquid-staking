@@ -1,5 +1,5 @@
 diff --git a/contracts/sources/storage.move b/contracts/sources/storage.move
-index d3de10c..8a3456f 100644
+index d3de10c..2102eca 100644
 --- a/contracts/sources/storage.move
 +++ b/contracts/sources/storage.move
 @@ -61,20 +61,22 @@ module liquid_staking::storage {
@@ -9,7 +9,8 @@ index d3de10c..8a3456f 100644
 +    fun log<T>(_: &T) {}
 +
      /* Public View Functions */
-     public(package) fun sui_pool(self: &Storage): &Balance<SUI> {
+-    public(package) fun sui_pool(self: &Storage): &Balance<SUI> {
++    public fun sui_pool(self: &Storage): &Balance<SUI> {
          &self.sui_pool
      }
  
@@ -28,6 +29,34 @@ index d3de10c..8a3456f 100644
          self.last_refresh_epoch
      }
  
+@@ -86,15 +88,15 @@ module liquid_staking::storage {
+         self.validator_address
+     }
+ 
+-    public(package) fun active_stake(self: &ValidatorInfo): &Option<FungibleStakedSui> {
++    public fun active_stake(self: &ValidatorInfo): &Option<FungibleStakedSui> {
+         &self.active_stake
+     }
+ 
+-    public(package) fun inactive_stake(self: &ValidatorInfo): &Option<StakedSui> {
++    public fun inactive_stake(self: &ValidatorInfo): &Option<StakedSui> {
+         &self.inactive_stake
+     }
+ 
+-    public(package) fun exchange_rate(self: &ValidatorInfo): &PoolTokenExchangeRate {
++    public fun exchange_rate(self: &ValidatorInfo): &PoolTokenExchangeRate {
+         &self.exchange_rate
+     }
+ 
+@@ -126,7 +128,7 @@ module liquid_staking::storage {
+     /// - Moves any inactive stake that can be converted to active stake.
+     /// - Removes validators that have no stake.
+     /// Returns true if the storage was updated.
+-    public(package) fun refresh(
++    public fun refresh(
+         self: &mut Storage, 
+         system_state: &mut SuiSystemState, 
+         ctx: &mut TxContext
 @@ -214,7 +216,7 @@ module liquid_staking::storage {
      fun refresh_validator_info(self: &mut Storage, i: u64) {
          let validator_info = &mut self.validator_infos[i];
