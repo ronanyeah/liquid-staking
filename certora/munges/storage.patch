@@ -1,8 +1,20 @@
 diff --git a/contracts/sources/storage.move b/contracts/sources/storage.move
-index d3de10c..3b499ba 100644
+index d3de10c..8a3456f 100644
 --- a/contracts/sources/storage.move
 +++ b/contracts/sources/storage.move
-@@ -70,11 +70,11 @@ module liquid_staking::storage {
+@@ -61,20 +61,22 @@ module liquid_staking::storage {
+         }
+     }
+ 
++    fun log<T>(_: &T) {}
++
+     /* Public View Functions */
+     public(package) fun sui_pool(self: &Storage): &Balance<SUI> {
+         &self.sui_pool
+     }
+ 
+-    public(package) fun validators(self: &Storage): &vector<ValidatorInfo> {
++    public fun validators(self: &Storage): &vector<ValidatorInfo> {
          &self.validator_infos
      }
  
@@ -16,15 +28,15 @@ index d3de10c..3b499ba 100644
          self.last_refresh_epoch
      }
  
-@@ -437,6 +437,8 @@ module liquid_staking::storage {
-         unstaked_sui_amount
-     }
- 
-+
-+    fun log<T>(_: &T) {}
-     // This function approximately unstakes n SUI from validators, then returns up to n SUI.
-     public(package) fun split_n_sui(
-         self: &mut Storage,
+@@ -214,7 +216,7 @@ module liquid_staking::storage {
+     fun refresh_validator_info(self: &mut Storage, i: u64) {
+         let validator_info = &mut self.validator_infos[i];
+         self.total_sui_supply = self.total_sui_supply - validator_info.total_sui_amount;
+-
++        log(validator_info);
+         let mut total_sui_amount = 0;
+         if (validator_info.active_stake.is_some()) {
+             let active_stake = validator_info.active_stake.borrow();
 @@ -459,6 +461,8 @@ module liquid_staking::storage {
              };
          };
@@ -43,3 +55,12 @@ index d3de10c..3b499ba 100644
          assert!(self.sui_pool.value() >= max_sui_amount_out, ENotEnoughSuiInSuiPool);
          self.split_from_sui_pool(max_sui_amount_out)
      }
+@@ -593,7 +599,7 @@ module liquid_staking::storage {
+     }
+ 
+     /// copied directly from staking_pool.move
+-    fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
++    public fun get_sui_amount(exchange_rate: &PoolTokenExchangeRate, token_amount: u64): u64 {
+         // When either amount is 0, that means we have no stakes with this pool.
+         // The other amount might be non-zero when there's dust left in the pool.
+         if (exchange_rate.sui_amount() == 0 || exchange_rate.pool_token_amount() == 0) {
