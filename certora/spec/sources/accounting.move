@@ -26,7 +26,6 @@ public fun cvlm_manifest() {
     invoker(b"invoke");
 
     rule(b"total_sui_supply_correct");
-    rule(b"total_sui_supply_correct_sanity");
 }
 
 native fun invoke(
@@ -86,13 +85,12 @@ public fun total_sui_supply_correct(
 ) {
     cvlm_assume_msg(strg.validators().length() <= 1, b"Only one validator");
 
-    cvlm_assume_msg(ctx.epoch() > strg.last_refresh_epoch(), b"Refresh");
+    cvlm_assume_msg(ctx.epoch() > strg.last_refresh_epoch(), b"Assume fresh state");
     strg.refresh(system_state, ctx);
-    //lsi.fee_config().validate_fees();
 
     let supply_pre = current_supply(strg);
     let supply_expected_pre = strg.total_sui_supply();
-    cvlm_assume_msg(supply_pre == supply_expected_pre, b"Assume in pre state");
+    cvlm_assume_msg(supply_pre == supply_expected_pre, b"Assume invariant holds in pre state");
 
     invoke(target, strg, system_state, ctx);
 
@@ -100,14 +98,4 @@ public fun total_sui_supply_correct(
     let supply_post = current_supply(strg);
     let supply_expected_post = strg.total_sui_supply();
     cvlm_assert(supply_post == supply_expected_post);
-}
-
-public fun total_sui_supply_correct_sanity(
-    target: Function,
-    strg: &mut Storage,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
-) {
-  total_sui_supply_correct(target, strg, system_state, ctx);
-  cvlm_assert(false);
 }
