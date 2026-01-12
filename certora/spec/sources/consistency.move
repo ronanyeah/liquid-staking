@@ -1,10 +1,11 @@
-module spec::accounting;
+module spec::consistency;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
 use cvlm::manifest::{target, invoker, rule};
-use liquid_staking::storage::{Storage, get_sui_amount, active_stake};
+use liquid_staking::storage::{Self, Storage, get_sui_amount, active_stake, new};
 use sui_system::sui_system::SuiSystemState;
+use cvlm::ghost::ghost_destroy;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -25,7 +26,8 @@ public fun cvlm_manifest() {
 
     invoker(b"invoke");
 
-    rule(b"total_sui_supply_correct");
+    rule(b"total_sui_supply_correct_base");
+    rule(b"total_sui_supply_correct_step");
 }
 
 native fun invoke(
@@ -62,22 +64,29 @@ fun validator_sui_supply(strg: &Storage, i: u64): u64 {
     let active_stake = staked_active(strg, i);
     let inactive_stake = staked_inactive(strg, i);
 
-
     active_stake + inactive_stake
 }
 
 fun current_supply(strg: &Storage): u64 {
-  let mut i = 0;
-  let mut v = strg.sui_pool().value();
+    let mut i = 0;
+    let mut v = strg.sui_pool().value();
 
-  while (i < strg.validators().length()) {
-    v = v + validator_sui_supply(strg, i);
-    i = i+1;
-  };  
-  v
+    while (i < strg.validators().length()) {
+        v = v + validator_sui_supply(strg, i);
+        i = i+1;
+    };
+    v
 }
 
-public fun total_sui_supply_correct(
+public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
+    let strg = storage::new(ctx);
+    let supply = current_supply(&strg);
+    let supply_expected = strg.total_sui_supply();
+    cvlm_assert(supply == supply_expected);
+    ghost_destroy(strg);
+}
+
+public fun total_sui_supply_correct_step(
     target: Function,
     strg: &mut Storage,
     system_state: &mut SuiSystemState,

@@ -1,7 +1,16 @@
 diff --git a/contracts/sources/storage.move b/contracts/sources/storage.move
-index d3de10c..70d75ed 100644
+index d3de10c..a5fce28 100644
 --- a/contracts/sources/storage.move
 +++ b/contracts/sources/storage.move
+@@ -51,7 +51,7 @@ module liquid_staking::storage {
+         extra_fields: Bag
+     }
+ 
+-    public(package) fun new(ctx: &mut TxContext): Storage {
++    public fun new(ctx: &mut TxContext): Storage {
+         Storage {
+             sui_pool: balance::zero(),
+             validator_infos: vector::empty(),
 @@ -62,39 +62,39 @@ module liquid_staking::storage {
      }
  
@@ -68,6 +77,15 @@ index d3de10c..70d75ed 100644
          let mut total_sui_amount = 0;
          if (validator_info.active_stake.is_some()) {
              let active_stake = validator_info.active_stake.borrow();
+@@ -543,7 +542,7 @@ module liquid_staking::storage {
+     }
+ 
+     /* Private functions */
+-    fun get_or_add_validator_index_by_staking_pool_id_mut(
++    public fun get_or_add_validator_index_by_staking_pool_id_mut(
+         self: &mut Storage, 
+         system_state: &mut SuiSystemState,
+         staking_pool_id: ID,
 @@ -593,7 +592,7 @@ module liquid_staking::storage {
      }
  
