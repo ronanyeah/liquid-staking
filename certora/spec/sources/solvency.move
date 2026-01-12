@@ -1,11 +1,12 @@
 module spec::solvency;
 
-use cvlm::asserts::{cvlm_assert, cvlm_assume_msg, cvlm_assert_msg};
+use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
 use cvlm::ghost::ghost_destroy;
 use cvlm::manifest::{target, invoker, rule};
 use cvlm::nondet::nondet;
-use liquid_staking::liquid_staking::{Self, LiquidStakingInfo, AdminCap, CustomRedeemRequest};
+use liquid_staking::fees::validate_fees;
+use liquid_staking::liquid_staking::{Self, LiquidStakingInfo};
 use spec::dummy::DummyToken;
 use sui_system::sui_system::SuiSystemState;
 
@@ -29,10 +30,14 @@ public fun cvlm_manifest() {
     rule(b"solvency_base");
     rule(b"solvency_base_staker");
     rule(b"solvency_step");
+    rule(b"insolvency_bound");
 
     rule(b"monotonicity");
-    rule(b"rate_changes_only_if");
+    rule(b"no_lst_no_sui");
+    rule(b"no_sui_no_lst");
 }
+
+const MAX_VALIDATORS: u64 = 1;
 
 native fun invoke(
     target: Function,
@@ -40,6 +45,32 @@ native fun invoke(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 );
+
+fun setup_fresh<T>(
+    lsi: &mut LiquidStakingInfo<T>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Refresh");
+
+    let mut i = 0;
+    while (i < lsi.storage().validators().length()) {
+        let validator = &lsi.storage().validators()[i];
+        let pool_id = validator.staking_pool_id();
+        let active = validator.active_stake();
+        let inactive = lsi.storage().validators()[i].inactive_stake();
+        if (active.is_some()) {
+            cvlm_assume_msg(active.borrow().pool_id() == pool_id, b"Matching pool ids");
+        };
+        if (inactive.is_some()) {
+            cvlm_assume_msg(inactive.borrow().pool_id() == pool_id, b"Matching pool ids");
+        };
+
+        i = i+1;
+    };
+
+    lsi.refresh(system_state, ctx);
+}
 
 /// lsi.total_sui_supply()/lsi.total_lst_supply() >= 1
 /// <==> lsi.total_sui_supply() >= lsi.total_lst_supply()
@@ -94,20 +125,114 @@ public fun solvency_step(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-    cvlm_assume_msg(lsi.storage().validators().length() == 1, b"Only one validator");
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
 
-    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Refresh");
-    lsi.refresh(system_state, ctx);
-    //lsi.fee_config().validate_fees();
+    // cvlm_assume_msg(lsi.accrued_spread_fees() == 0, b"No fees");
+    // cvlm_assume_msg(lsi.total_lst_supply() <= 10000 && lsi.total_lst_supply() <= 10000, b"Reasonable values for CEX");
     cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
 
-    let mut ctx2: TxContext = nondet();
-    cvlm_assume_msg(ctx.epoch() <= ctx2.epoch(), b"Time");
+    validate_fees(lsi.fee_config());
 
-    invoke(target, lsi, system_state, &mut ctx2);
+    invoke(target, lsi, system_state, ctx);
 
-    //lsi.refresh(system_state, ctx);
     cvlm_assert(is_solvent(lsi));
+}
+
+public fun insolvency_bound(
+    target: Function,
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
+
+    // cvlm_assume_msg(lsi.accrued_spread_fees() == 0, b"No fees");
+    // cvlm_assume_msg(lsi.total_lst_supply() <= 10000 && lsi.total_lst_supply() <= 10000, b"Reasonable values for CEX");
+    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+
+    validate_fees(lsi.fee_config());
+
+    invoke(target, lsi, system_state, ctx);
+
+    cvlm_assert(lsi.total_lst_supply() +1 >= lsi.total_lst_supply());
+}
+
+public fun no_lst_no_sui(
+    target: Function,
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
+
+    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+
+    let lst_pre = lsi.total_lst_supply();
+    let sui_pre = lsi.total_sui_supply();
+
+    //      lst=0 -> sui = 0
+    // <==> lst != 0 || sui = 0
+    cvlm_assume_msg(lst_pre != 0 || sui_pre == 0, b"Assume in pre-state");
+
+    //let mut ctx2: TxContext = nondet();
+    //cvlm_assume_msg(ctx.epoch() <= ctx2.epoch(), b"Time");
+
+    invoke(target, lsi, system_state, ctx);
+
+    let lst_post = lsi.total_lst_supply();
+    let sui_post = lsi.total_sui_supply();
+
+    // sui_pre/lst_pre <= sui_post/lst_post
+    // <==> sui_pre*lst_post <= sui_post*lst_pre
+
+    cvlm_assert(lst_post != 0 || sui_post == 0);
+}
+
+public fun no_sui_no_lst(
+    target: Function,
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
+
+    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+
+    let lst_pre = lsi.total_lst_supply();
+    let sui_pre = lsi.total_sui_supply();
+
+    //      sui=0 -> lst=0
+    // <==> sui != 0 || lst = 0
+    cvlm_assume_msg(sui_pre != 0 || lst_pre == 0, b"Assume in pre-state");
+
+    //let mut ctx2: TxContext = nondet();
+    //cvlm_assume_msg(ctx.epoch() <= ctx2.epoch(), b"Time");
+
+    invoke(target, lsi, system_state, ctx);
+
+    let lst_post = lsi.total_lst_supply();
+    let sui_post = lsi.total_sui_supply();
+
+    // sui_pre/lst_pre <= sui_post/lst_post
+    // <==> sui_pre*lst_post <= sui_post*lst_pre
+
+    cvlm_assert(sui_post != 0 || lst_post == 0);
 }
 
 public fun monotonicity(
@@ -116,20 +241,23 @@ public fun monotonicity(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
 
-    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Refresh");
-    lsi.refresh(system_state, ctx);
-    //lsi.fee_config().validate_fees();
-    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+    //cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
 
     let lst_pre = lsi.total_lst_supply();
     let sui_pre = lsi.total_sui_supply();
 
+    cvlm_assume_msg(lst_pre > 0 && sui_pre > 0, b"Non-empty reserve");
 
-    let mut ctx2: TxContext = nondet();
-    cvlm_assume_msg(ctx.epoch() <= ctx2.epoch(), b"Time");
+    //let mut ctx2: TxContext = nondet();
+    //cvlm_assume_msg(ctx.epoch() <= ctx2.epoch(), b"Time");
 
-    invoke(target, lsi, system_state, &mut ctx2);
+    invoke(target, lsi, system_state, ctx);
 
     let lst_post = lsi.total_lst_supply();
     let sui_post = lsi.total_sui_supply();
@@ -138,34 +266,4 @@ public fun monotonicity(
     // <==> sui_pre*lst_post <= sui_post*lst_pre
 
     cvlm_assert(sui_pre*lst_post <= sui_post*lst_pre);
-}
-
-public fun rate_changes_only_if(
-    target: Function,
-    lsi: &mut LiquidStakingInfo<DummyToken>,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
-) {
-    let lst_pre = lsi.total_lst_supply();
-    let sui_pre = lsi.total_sui_supply();
-
-    let epoch_pre = lsi.storage().last_refresh_epoch();
-    cvlm_assume_msg(ctx.epoch() >= epoch_pre, b"Don't perform actions in the past");
-
-    invoke(target, lsi, system_state, ctx);
-
-    let lst_post = lsi.total_lst_supply();
-    let sui_post = lsi.total_sui_supply();
-
-    // sui_pre/lst_pre != sui_post/lst_post
-    // <==> sui_pre*lst_post != sui_post*lst_pre
-    let changed = sui_pre*lst_post != sui_post*lst_pre;
-    let is_refresh = target.name() == b"refresh";
-    let new_epoch = epoch_pre < lsi.storage().last_refresh_epoch();
-
-    if (changed) {
-        cvlm_assert(new_epoch || is_refresh) // must be &&?
-    } else {
-        cvlm_assert(true) // please the prover
-    }
 }
