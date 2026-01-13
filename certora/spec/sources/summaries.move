@@ -34,12 +34,6 @@ public fun cvlm_manifest() {
         b"pool_token_exchange_rate_at_epoch",
     );
 
-    summary(
-        b"burn",
-        @sui,
-        b"coin",
-        b"burn",
-    );
 
     ghost(b"fungible_total_supply");
     ghost(b"fungible_total_principal");
@@ -264,11 +258,4 @@ public fun request_withdraw_stake_non_entry(
     cvlm_assume_msg(w.value() == am, b"Exchange");
     ghost_destroy(staked_sui);
     w
-}
-
-
-fun burn<T>(cap: &mut TreasuryCap<T>, c: Coin<T>): u64 {
-    let b = c.value();
-    ghost_destroy(c);
-    b
 }
