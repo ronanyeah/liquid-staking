@@ -26,6 +26,10 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/Mystenlabs/suiup/main/install.sh | sh
           export PATH="$HOME/.local/bin:$PATH"
           suiup install -y sui@testnet
+      - name: Sui version
+        run: |
+          sui -V
+          sui move -V
       - name: Apply patch
         run: ./certora/munges/munge.sh
       - name: Submit Jobs to Certora Prover
