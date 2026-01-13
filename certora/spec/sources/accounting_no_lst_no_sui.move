@@ -8,6 +8,11 @@ use spec::dummy::DummyToken;
 use sui_system::sui_system::SuiSystemState;
 use spec::common::setup_fresh;
 use spec::solvency::is_solvent;
+use spec::accounting_total_sui_supply::total_supply_correct;
+use cvlm::ghost::ghost_destroy;
+use liquid_staking::liquid_staking::create_lst;
+use cvlm::nondet::nondet;
+use liquid_staking::liquid_staking::create_lst_with_stake;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -25,8 +30,11 @@ public fun cvlm_manifest() {
 
     invoker(b"invoke");
 
-    rule(b"no_lst_no_sui");
-    rule(b"no_sui_no_lst");
+    rule(b"no_lst_no_sui_step");
+    rule(b"no_lst_no_sui_base");
+    
+    rule(b"no_sui_no_lst_base");
+    rule(b"no_sui_no_lst_step");
 }
 
 const MAX_VALIDATORS: u64 = 1;
@@ -39,42 +47,46 @@ native fun invoke(
 );
 
 
-
-
-public fun no_lst_no_sui(
-    target: Function,
-    lsi: &mut LiquidStakingInfo<DummyToken>,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
-) {
-    cvlm_assume_msg(
-        lsi.storage().validators().length() <= MAX_VALIDATORS,
-        b"Restrict number of validators",
-    );
-    setup_fresh(lsi, system_state, ctx);
-
-    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
-
-    let lst_pre = lsi.total_lst_supply();
-    let sui_pre = lsi.total_sui_supply();
-
-    //      lst=0 -> sui = 0
-    // <==> lst != 0 || sui = 0
-    cvlm_assume_msg(lst_pre != 0 || sui_pre == 0, b"Assume in pre-state");
-
-
-    invoke(target, lsi, system_state, ctx);
-
-    let lst_post = lsi.total_lst_supply();
-    let sui_post = lsi.total_sui_supply();
-
-    // sui_pre/lst_pre <= sui_post/lst_post
-    // <==> sui_pre*lst_post <= sui_post*lst_pre
-
-    cvlm_assert(lst_post != 0 || sui_post == 0);
+public fun no_lst_no_sui<P>(lsi: &LiquidStakingInfo<P>): bool {
+  let lst = lsi.total_lst_supply();
+  let sui = lsi.total_sui_supply();
+  // lst == 0 -> sui == 0 <==> lst != 0 || sui == 0
+  lst != 0 || sui == 0
 }
 
-public fun no_sui_no_lst(
+public fun no_sui_no_lst<P>(lsi: &LiquidStakingInfo<P>): bool {
+  let lst = lsi.total_lst_supply();
+  let sui = lsi.total_sui_supply();
+  // sui == 0 -> lst == 0 <==> sui != 0 || lst == 0
+  sui != 0 || lst == 0
+}
+
+public fun no_lst_no_sui_base(
+    ctx: &mut TxContext,
+) {
+    let fee_config = nondet();
+    let lst_treasury_cap = nondet();    
+    let (_cap, lsi) = create_lst<DummyToken>(fee_config, lst_treasury_cap, ctx);
+    cvlm_assert(no_lst_no_sui(&lsi));
+
+    ghost_destroy(lsi);
+    ghost_destroy(_cap);
+
+    let fee_config = nondet();
+    let lst_treasury_cap = nondet();    
+    let mut system_state = nondet();
+    let fungible_staked_suis = nondet();
+    let sui = nondet();
+    let (_cap, lsi) = create_lst_with_stake<DummyToken>(&mut system_state, fee_config, lst_treasury_cap, fungible_staked_suis, sui, ctx);
+    cvlm_assert(no_lst_no_sui(&lsi));
+
+    ghost_destroy(lsi);
+    ghost_destroy(_cap);
+    ghost_destroy(system_state);
+
+}
+
+public fun no_lst_no_sui_step(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -87,21 +99,66 @@ public fun no_sui_no_lst(
     setup_fresh(lsi, system_state, ctx);
 
     cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+    
+    cvlm_assume_msg(total_supply_correct(lsi.storage()), b"Correct accounting");
 
-    let lst_pre = lsi.total_lst_supply();
-    let sui_pre = lsi.total_sui_supply();
 
-    //      sui=0 -> lst=0
-    // <==> sui != 0 || lst = 0
-    cvlm_assume_msg(sui_pre != 0 || lst_pre == 0, b"Assume in pre-state");
+    cvlm_assume_msg(no_lst_no_sui(lsi), b"Assume in pre-state");
+
 
     invoke(target, lsi, system_state, ctx);
 
-    let lst_post = lsi.total_lst_supply();
-    let sui_post = lsi.total_sui_supply();
 
-    // sui_pre/lst_pre <= sui_post/lst_post
-    // <==> sui_pre*lst_post <= sui_post*lst_pre
 
-    cvlm_assert(sui_post != 0 || lst_post == 0);
+    cvlm_assert(no_lst_no_sui(lsi));
+}
+
+
+public fun no_sui_no_lst_base(
+    ctx: &mut TxContext,
+) {
+    let fee_config = nondet();
+    let lst_treasury_cap = nondet();    
+    let (_cap, lsi) = create_lst<DummyToken>(fee_config, lst_treasury_cap, ctx);
+    cvlm_assert(no_sui_no_lst(&lsi));
+
+    ghost_destroy(lsi);
+    ghost_destroy(_cap);
+
+    let fee_config = nondet();
+    let lst_treasury_cap = nondet();    
+    let mut system_state = nondet();
+    let fungible_staked_suis = nondet();
+    let sui = nondet();
+    let (_cap, lsi) = create_lst_with_stake<DummyToken>(&mut system_state, fee_config, lst_treasury_cap, fungible_staked_suis, sui, ctx);
+    cvlm_assert(no_sui_no_lst(&lsi));
+
+    ghost_destroy(lsi);
+    ghost_destroy(_cap);
+    ghost_destroy(system_state);
+
+}
+
+public fun no_sui_no_lst_step(
+    target: Function,
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(
+        lsi.storage().validators().length() <= MAX_VALIDATORS,
+        b"Restrict number of validators",
+    );
+    setup_fresh(lsi, system_state, ctx);
+
+    cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
+    cvlm_assume_msg(total_supply_correct(lsi.storage()), b"Correct accounting");
+
+
+    cvlm_assume_msg(no_sui_no_lst(lsi), b"Assume in pre-state");
+
+    invoke(target, lsi, system_state, ctx);
+
+
+    cvlm_assert(no_sui_no_lst(lsi));
 }

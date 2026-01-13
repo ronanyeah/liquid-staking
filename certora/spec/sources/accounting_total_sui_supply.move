@@ -79,11 +79,15 @@ fun current_supply(strg: &Storage): u64 {
     v
 }
 
+public fun total_supply_correct(strg: &Storage): bool {
+    let expected = current_supply(strg);
+    let actual  = strg.total_sui_supply();
+    expected == actual
+}
+
 public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
-    let supply = current_supply(&strg);
-    let supply_expected = strg.total_sui_supply();
-    cvlm_assert(supply == supply_expected);
+    cvlm_assert(total_supply_correct(&strg));
     ghost_destroy(strg);
 }
 
@@ -98,16 +102,13 @@ public fun total_sui_supply_correct_step(
     cvlm_assume_msg(ctx.epoch() > strg.last_refresh_epoch(), b"Assume fresh state");
     strg.refresh(system_state, ctx);
 
-    let supply_pre = current_supply(strg);
-    let supply_expected_pre = strg.total_sui_supply();
-    cvlm_assume_msg(supply_pre == supply_expected_pre, b"Assume invariant holds in pre state");
+
+    cvlm_assume_msg(total_supply_correct(strg), b"Assume invariant holds in pre state");
 
     invoke(target, strg, system_state, ctx);
 
     strg.refresh(system_state, ctx); // No necessary but to be extra sure everything is up to date
-    let supply_post = current_supply(strg);
-    let supply_expected_post = strg.total_sui_supply();
-    cvlm_assert(supply_post == supply_expected_post);
+    cvlm_assert(total_supply_correct(strg));
 }
 
 
