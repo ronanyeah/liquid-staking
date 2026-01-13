@@ -10,7 +10,7 @@ public fun setup_fresh<T>(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Refresh");
+    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Force refresh");
 
     let mut i = 0;
     while (i < lsi.storage().validators().length()) {
