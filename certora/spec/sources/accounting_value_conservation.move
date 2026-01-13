@@ -1,20 +1,17 @@
 module spec::accounting_value_conservation;
 
-use cvlm::asserts::{cvlm_assert};
+use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
-use cvlm::manifest::{target, invoker};
-use liquid_staking::liquid_staking::{LiquidStakingInfo};
-use spec::dummy::DummyToken;
-use sui_system::sui_system::SuiSystemState;
-use cvlm::manifest::rule;
-use cvlm::asserts::cvlm_assume_msg;
-use spec::common::setup_fresh;
-use spec::accounting_total_sui_supply::total_supply_correct;
-use cvlm::nondet::nondet;
 use cvlm::ghost::ghost_destroy;
+use cvlm::manifest::{target, invoker, rule};
+use cvlm::nondet::nondet;
+use liquid_staking::liquid_staking::LiquidStakingInfo;
+use spec::accounting_total_sui_supply::total_supply_correct;
+use spec::common::{setup_fresh, log, can_decrease_supply};
+use spec::dummy::DummyToken;
 use sui::coin::Coin;
 use sui::sui::SUI;
-use spec::common::log;
+use sui_system::sui_system::SuiSystemState;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -34,10 +31,9 @@ public fun cvlm_manifest() {
 
     rule(b"sui_value_conservation");
     rule(b"lst_value_conservation");
-    
+
     rule(b"deposit_value_conservation");
     rule(b"redeem_value_conservation");
-
 }
 
 native fun invoke(
@@ -47,18 +43,12 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
-
-fun can_decrease_supply(f: Function): bool {
-  f.name() == b"redeem" || f.name() == b"custom_redeem"
-}
-
 public fun sui_value_conservation(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-
     setup_fresh(lsi, system_state, ctx);
     let sui_pre = lsi.total_sui_supply();
 
@@ -70,7 +60,6 @@ public fun sui_value_conservation(
 
     cvlm_assert(sui_post >= sui_pre);
 }
-
 
 public fun lst_value_conservation(
     target: Function,
@@ -87,7 +76,6 @@ public fun lst_value_conservation(
 
     cvlm_assert(lst_post >= lst_pre);
 }
-
 
 public fun deposit_value_conservation(
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -108,13 +96,10 @@ public fun deposit_value_conservation(
     let sui_increase = lsi.total_sui_supply() - sui_pre;
     let fee_increase = lsi.fees() - fees_pre;
 
-
     cvlm_assert(sui_increase + fee_increase == sui_value);
-
 
     ghost_destroy(lst);
 }
-
 
 public fun redeem_value_conservation(
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -142,7 +127,6 @@ public fun redeem_value_conservation(
     log(&(fee_increase + sui.value()));
     log(&sui_decrease);
     cvlm_assert(fee_increase + sui.value() == sui_decrease);
-
 
     ghost_destroy(sui);
 }
