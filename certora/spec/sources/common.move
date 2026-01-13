@@ -30,3 +30,5 @@ public fun setup_fresh<T>(
 
     lsi.refresh(system_state, ctx);
 }
+
+public fun log<T>(_: &T) {}
