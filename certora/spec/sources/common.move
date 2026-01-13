@@ -3,6 +3,7 @@ module spec::common;
 use liquid_staking::liquid_staking::LiquidStakingInfo;
 use sui_system::sui_system::SuiSystemState;
 use cvlm::asserts::cvlm_assume_msg;
+use cvlm::function::Function;
 
 
 public fun setup_fresh<T>(
@@ -32,3 +33,11 @@ public fun setup_fresh<T>(
 }
 
 public fun log<T>(_: &T) {}
+
+public fun can_decrease_supply(f: Function): bool {
+  f.name() == b"redeem" || f.name() == b"custom_redeem"
+}
+
+public fun can_increase_supply(f: Function): bool {
+  f.name() == b"mint"
+}

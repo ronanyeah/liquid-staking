@@ -13,8 +13,6 @@ use sui::tx_context::epoch;
 use sui_system::staking_pool::{PoolTokenExchangeRate, StakedSui, StakingPool, FungibleStakedSui};
 use sui_system::sui_system::SuiSystemState;
 use cvlm::asserts::cvlm_assert;
-use sui::coin::TreasuryCap;
-use sui::coin::Coin;
 
 public fun cvlm_manifest() {
     ghost(b"exchange_rate");
@@ -169,7 +167,7 @@ public fun redeem_fungible_staked_sui(
     sui_out
 }
 
-fun calculate_fungible_staked_sui_withdraw_amount(
+public(package) fun calculate_fungible_staked_sui_withdraw_amount(
     latest_exchange_rate: PoolTokenExchangeRate,
     fungible_staked_sui_value: u64,
     fungible_staked_sui_data_principal_amount: u64, // fungible_staked_sui_data.principal.value()

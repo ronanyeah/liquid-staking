@@ -1,15 +1,14 @@
 name: Certora Prover 
 
 on:
-  push:
+  pull_request:
     branches:
       - kel/specs
       - certora
-  pull_request:
   workflow_dispatch:
 
 jobs:
-  certora_run_health:
+  certora_run:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,7 +44,7 @@ jobs:
             confs/integrity.conf
             confs/solvency.conf
             confs/validators_consistency.conf
-          job-name: "Verify Obligation Health Rules"
+          job-name: "Verification"
           certora-key: ${{ secrets.CERTORAKEY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
