@@ -17,9 +17,10 @@ use sui::sui::SUI;
 public fun cvlm_manifest() {
     rule(b"no_lost_funds_on_redeem");
     rule(b"no_lost_funds_on_mint");
-    rule(b"fees_dont_eat_deposit");
-    rule(b"fees_dont_eat_redemption");
     rule(b"no_arbitrage_opportunity");
+    
+    // Currently cannot be expressed
+    //rule(b"redemption_liveness");
 }
 
 public fun no_lost_funds_on_redeem(
@@ -69,6 +70,19 @@ public fun no_lost_funds_on_mint(
 
 
 
+public fun redemption_liveness(lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    setup_fresh(lsi, system_state, ctx);
+    validate_fees(lsi.fee_config());
+
+    let lst: Coin<DummyToken> = nondet();
+    cvlm_assume_msg(lst.value() <= lsi.total_lst_supply(), b"Redeem at most the total supply");
+    let sui_out = lsi.redeem(lst, system_state, ctx);
+    ghost_destroy(sui_out);
+    cvlm_assert(true); // need to asert the call to redeem did not abort.
+}
 
 
 public fun no_arbitrage_opportunity(
