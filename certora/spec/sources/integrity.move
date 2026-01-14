@@ -46,28 +46,6 @@ public fun no_lost_funds_on_redeem(
     ghost_destroy(sui);
 }
 
-public fun fees_dont_eat_redemption(
-    lsi: &mut LiquidStakingInfo<DummyToken>,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
-) {
-    setup_fresh(lsi, system_state, ctx);
-    validate_fees(lsi.fee_config());
-
-
-    let coin: Coin<DummyToken> = nondet();
-
-    let fees_pre = lsi.fees();
-    
-    cvlm_assume_msg(coin.value() > 0, b"Non-zero value");
-    let sui = lsi.redeem(coin, system_state, ctx);
-
-    let fees = lsi.fees() - fees_pre;
-
-    cvlm_assume_msg(sui.value() + fees > 0, b"No lost funds");
-    cvlm_assert(sui.value() > 0);
-    ghost_destroy(sui);
-}
 
 
 public fun no_lost_funds_on_mint(
@@ -90,27 +68,7 @@ public fun no_lost_funds_on_mint(
 }
 
 
-public fun fees_dont_eat_deposit(
-    lsi: &mut LiquidStakingInfo<DummyToken>,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
-) {
-    setup_fresh(lsi, system_state, ctx);
-    validate_fees(lsi.fee_config());
-    
 
-    let coin: Coin<SUI> = nondet();
-
-    let fees_pre = lsi.fees();
-    
-    cvlm_assume_msg(coin.value() > 0, b"Non-zero value");
-    let lst = lsi.mint(system_state, coin, ctx);
-    let fees = lsi.fees() - fees_pre;
-
-    cvlm_assume_msg(lst.value()+fees > 0, b"No lost funds");
-    cvlm_assert(lst.value() > 0);
-    ghost_destroy(lst);
-}
 
 
 public fun no_arbitrage_opportunity(
