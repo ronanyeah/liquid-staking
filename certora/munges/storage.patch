@@ -1,5 +1,5 @@
 diff --git a/contracts/sources/storage.move b/contracts/sources/storage.move
-index d3de10c..a5fce28 100644
+index d3de10c..73efcfa 100644
 --- a/contracts/sources/storage.move
 +++ b/contracts/sources/storage.move
 @@ -51,7 +51,7 @@ module liquid_staking::storage {
@@ -11,7 +11,7 @@ index d3de10c..a5fce28 100644
          Storage {
              sui_pool: balance::zero(),
              validator_infos: vector::empty(),
-@@ -62,39 +62,39 @@ module liquid_staking::storage {
+@@ -62,43 +62,47 @@ module liquid_staking::storage {
      }
  
      /* Public View Functions */
@@ -60,7 +60,25 @@ index d3de10c..a5fce28 100644
          &self.exchange_rate
      }
  
-@@ -126,7 +126,7 @@ module liquid_staking::storage {
+-    public(package) fun total_sui_amount(self: &ValidatorInfo): u64 {
++    public fun exchange_rate_mut(self: &ValidatorInfo): &PoolTokenExchangeRate {
++        &self.exchange_rate
++    }
++
++    public fun total_sui_amount(self: &ValidatorInfo): u64 {
+         self.total_sui_amount
+     }
+ 
+@@ -115,7 +119,7 @@ module liquid_staking::storage {
+         i
+     }
+ 
+-    fun is_empty(self: &ValidatorInfo): bool {
++    public fun is_empty(self: &ValidatorInfo): bool {
+         self.active_stake.is_none() && self.inactive_stake.is_none() && self.total_sui_amount == 0
+     }
+ 
+@@ -126,7 +130,7 @@ module liquid_staking::storage {
      /// - Moves any inactive stake that can be converted to active stake.
      /// - Removes validators that have no stake.
      /// Returns true if the storage was updated.
@@ -69,15 +87,38 @@ index d3de10c..a5fce28 100644
          self: &mut Storage, 
          system_state: &mut SuiSystemState, 
          ctx: &mut TxContext
-@@ -214,7 +214,6 @@ module liquid_staking::storage {
-     fun refresh_validator_info(self: &mut Storage, i: u64) {
+@@ -189,7 +193,7 @@ module liquid_staking::storage {
+     // this may return none in the case where the staking pool is inactive or 
+     // if sui system is currently in safe mode. In both these cases, the storage
+     // object has the latest exchange rate already.
+-    fun get_latest_exchange_rate(
++    public fun get_latest_exchange_rate(
+         self: &Storage,
+         staking_pool_id: &ID,
+         system_state: &mut SuiSystemState,
+@@ -211,10 +215,9 @@ module liquid_staking::storage {
+ 
+     /// Update the total sui amount for the validator and modify the 
+     /// storage sui supply accordingly assumes the exchange rate is up to date
+-    fun refresh_validator_info(self: &mut Storage, i: u64) {
++    public fun refresh_validator_info(self: &mut Storage, i: u64) {
          let validator_info = &mut self.validator_infos[i];
          self.total_sui_supply = self.total_sui_supply - validator_info.total_sui_amount;
 -
          let mut total_sui_amount = 0;
          if (validator_info.active_stake.is_some()) {
              let active_stake = validator_info.active_stake.borrow();
-@@ -543,7 +542,7 @@ module liquid_staking::storage {
+@@ -390,7 +393,8 @@ module liquid_staking::storage {
+                 ((target_unstake_sui_amount as u128)
+                     * (fungible_staked_sui_amount as u128)
+                     + (total_sui_amount as u128)
+-                    - 1)
++                    - 1
++                    )
+                 / (total_sui_amount as u128)
+             ) as u64;
+ 
+@@ -543,7 +547,7 @@ module liquid_staking::storage {
      }
  
      /* Private functions */
@@ -86,7 +127,7 @@ index d3de10c..a5fce28 100644
          self: &mut Storage, 
          system_state: &mut SuiSystemState,
          staking_pool_id: ID,
-@@ -593,7 +592,7 @@ module liquid_staking::storage {
+@@ -593,7 +597,7 @@ module liquid_staking::storage {
      }
  
      /// copied directly from staking_pool.move
