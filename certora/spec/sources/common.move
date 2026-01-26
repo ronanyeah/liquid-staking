@@ -34,8 +34,6 @@ public fun setup_fresh<T>(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-  
-    /*  Refresh */
     let mut total_sui_supply = 0;
 
     let validator_addresses = active_validators();
@@ -47,7 +45,14 @@ public fun setup_fresh<T>(
         let active = validator.active_stake();
         let inactive = lsi.storage().validators()[i].inactive_stake();
         
+        // There is no inactive state after a call to refresh
+        // This is verified in the rule "no_inactive_stake_after_refresh"
         cvlm_assume_msg(inactive.is_none(), b"No inactive stake");
+        
+        // There are no empty validators after a call to refresh.
+        // This is verified in the rule "no_empty_validators_after_refresh"
+        // Since there is no inactive stake for this validator, not empty is equivalent to non-zero active stake.
+        // This is verified in the invariant "no_stake_no_sui"
         cvlm_assume_msg(active.is_some(), b"No empty validator");
         let active = active.borrow();
         cvlm_assume_msg(active.pool_id() == pool_id, b"Matching pool ids");
@@ -75,9 +80,7 @@ public fun setup_fresh<T>(
     };
     
     cvlm_assume_msg(lsi.storage().total_sui_supply() == total_sui_supply, b"Correct total sui supply");
-    cvlm_assume_msg(lsi.storage().last_refresh_epoch() == ctx.epoch(), b"Set last refresh");
-    /* End Refresh */
-    
+    cvlm_assume_msg(lsi.storage().last_refresh_epoch() == ctx.epoch(), b"Set last refresh");    
 }
 
 

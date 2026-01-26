@@ -1,14 +1,15 @@
 module spec::validators_consistency;
 
-use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
+use cvlm::asserts::{cvlm_assert, cvlm_assume_msg, cvlm_assert_msg};
 use cvlm::function::Function;
 use cvlm::ghost::ghost_destroy;
 use cvlm::manifest::{target, invoker, rule};
-use liquid_staking::storage::{Self, Storage, get_sui_amount, active_stake};
+use cvlm::nondet::nondet;
+use liquid_staking::liquid_staking::LiquidStakingInfo;
+use liquid_staking::storage::{Self, Storage, get_sui_amount, active_stake, ValidatorInfo};
+use spec::common::{log, setup};
+use spec::dummy::DummyToken;
 use sui_system::sui_system::SuiSystemState;
-use spec::common::log;
-use cvlm::asserts::cvlm_assert_msg;
-
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -32,11 +33,18 @@ public fun cvlm_manifest() {
 
     rule(b"total_sui_supply_correct_base");
     rule(b"total_sui_supply_correct_step");
-    
+
     rule(b"no_duplicate_validators");
     rule(b"can_add_correct");
     rule(b"can_remove_correct");
     rule(b"add_at_most_one");
+
+    rule(b"no_stake_no_sui_base");
+    rule(b"no_stake_no_sui_step");
+
+
+    rule(b"no_inactive_stake_after_refresh");
+    rule(b"no_empty_validators_after_refresh");
 }
 
 native fun invoke(
@@ -118,8 +126,6 @@ public fun total_sui_supply_correct_step(
     cvlm_assert(supply_post == supply_expected_post);
 }
 
-
-
 fun can_add_validator(target: Function): bool {
     target.name() == b"get_or_add_validator_index_by_staking_pool_id_mut"
     || target.name() == b"join_stake"
@@ -144,7 +150,6 @@ public fun can_add_correct(
     let allowed = can_add_validator(target);
 
     cvlm_assert(!appended || allowed);
-
 }
 
 public fun can_remove_correct(
@@ -163,14 +168,12 @@ public fun can_remove_correct(
     cvlm_assert(!removed || allowed);
 }
 
-
 public fun no_duplicate_validators(
     strg: &mut Storage,
     staking_pool_id: ID,
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-
     let validator_address = system_state.validator_address_by_pool_id(&staking_pool_id);
 
     let mut id_exists = false;
@@ -186,9 +189,13 @@ public fun no_duplicate_validators(
         i = i + 1;
     };
 
-    let index = strg.get_or_add_validator_index_by_staking_pool_id_mut(system_state, staking_pool_id, ctx);
+    let index = strg.get_or_add_validator_index_by_staking_pool_id_mut(
+        system_state,
+        staking_pool_id,
+        ctx,
+    );
     let appended = index == infos_pre;
-    
+
     log(&id_exists);
     log(&address_exists);
     log(&appended);
@@ -228,4 +235,74 @@ public fun validators_upper_bound_step(
     cvlm_assert_msg(strg.validators().length() <= MAX_VALIDATORS, b"Assume in pre state");
     invoke(target, strg, system_state, ctx);
     cvlm_assert(strg.validators().length() <= MAX_VALIDATORS);
+}
+
+fun validator_no_stake_no_sui(v: &ValidatorInfo): bool {
+    let no_active = v.active_stake().is_none();
+    let no_inactive = v.inactive_stake().is_none();
+    // (no active && no_inactive) => no sui
+    !(no_active && no_inactive) || v.total_sui_amount() == 0
+}
+
+fun no_stake_no_sui(strg: &Storage): bool {
+    let mut ret = true;
+    let mut i = 0;
+    while (i < strg.validators().length()) {
+        let v_i = &strg.validators()[i];
+        ret = ret && validator_no_stake_no_sui(v_i);
+        i = i+1;
+    };
+    ret
+}
+
+public fun no_stake_no_sui_base(ctx: &mut TxContext) {
+    let strg = storage::new(ctx);
+    cvlm_assert(no_stake_no_sui(&strg));
+    ghost_destroy(strg);
+}
+
+public fun no_stake_no_sui_step(
+    target: Function,
+    strg: &mut Storage,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    cvlm_assume_msg(no_stake_no_sui(strg), b"Assume in pre state");
+    invoke(target, strg, system_state, ctx);
+    strg.refresh(system_state, ctx);
+    cvlm_assert(no_stake_no_sui(strg));
+}
+
+public fun no_inactive_stake_after_refresh(
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    setup(lsi);
+    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Force refresh");
+
+    lsi.refresh(system_state, ctx);
+
+    let i = nondet();
+    cvlm_assume_msg(i < lsi.storage().validators().length(), b"");
+
+    let inactive = lsi.storage().validators()[i].inactive_stake();
+    cvlm_assert(inactive.is_none());
+}
+
+public fun no_empty_validators_after_refresh(
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    setup(lsi);
+    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Force refresh");
+
+    lsi.refresh(system_state, ctx);
+
+    let i = nondet();
+    cvlm_assume_msg(i < lsi.storage().validators().length(), b"");
+    let validator = &lsi.storage().validators()[i];
+
+    cvlm_assert(!validator.is_empty());
 }
