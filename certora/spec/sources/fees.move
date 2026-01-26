@@ -3,7 +3,7 @@ module spec::fees;
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
 use cvlm::ghost::ghost_destroy;
-use cvlm::manifest::{rule, target};
+use cvlm::manifest::{rule, target, invoker};
 use cvlm::nondet::nondet;
 use liquid_staking::fees::validate_fees;
 use liquid_staking::liquid_staking::LiquidStakingInfo;
@@ -12,7 +12,7 @@ use spec::dummy::DummyToken;
 use sui::coin::Coin;
 use sui::sui::SUI;
 use sui_system::sui_system::SuiSystemState;
-use cvlm::manifest::invoker;
+use liquid_staking::liquid_staking::create_lst;
 
 public fun cvlm_manifest() {
     target(@spec, b"dummy", b"mint");
@@ -29,7 +29,11 @@ public fun cvlm_manifest() {
 
     invoker(b"invoke");
 
+    rule(b"spread_fees_dont_exceed_sui_supply_base");
+    rule(b"spread_fees_dont_exceed_sui_supply_step");
+    
     rule(b"fees_grow_monotonically");
+    
     rule(b"fees_dont_eat_deposit");
     rule(b"fees_dont_eat_redemption");
 }
@@ -41,6 +45,42 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
+public fun spread_fees_dont_exceed_sui_supply_base(
+    ctx: &mut TxContext,
+) {
+    let fee_config = nondet();
+    let lst_treasury_cap = nondet();    
+    let (_cap, lsi) = create_lst<DummyToken>(fee_config, lst_treasury_cap, ctx);
+    let spread_fees = lsi.fees();
+    let sui = lsi.storage().total_sui_supply();
+    cvlm_assert(spread_fees <= sui);
+
+    ghost_destroy(_cap);
+    ghost_destroy(lsi);
+
+}
+
+public fun spread_fees_dont_exceed_sui_supply_step(
+    target: Function,
+    lsi: &mut LiquidStakingInfo<DummyToken>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+    // This already assumes spread_fees < storage.sui_supply, we'll make it explicit nevertheless
+    setup_fresh(lsi, system_state, ctx);
+    validate_fees(lsi.fee_config()); 
+    let spread_fees_pre = lsi.accrued_spread_fees();
+    let sui_pre = lsi.storage().total_sui_supply();
+
+    cvlm_assume_msg(spread_fees_pre <= sui_pre, b"Assume in precondition");
+
+    invoke(target, lsi, system_state, ctx);
+
+    let spread_fees_post = lsi.accrued_spread_fees();
+    let sui_post = lsi.storage().total_sui_supply();
+
+    cvlm_assert(spread_fees_post <= sui_post);
+}
 
 public fun fees_grow_monotonically(
     target: Function,
@@ -48,21 +88,20 @@ public fun fees_grow_monotonically(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-  setup_fresh(lsi, system_state, ctx);
-  validate_fees(lsi.fee_config());
-  let spread_fees_pre = lsi.fees();
+    setup_fresh(lsi, system_state, ctx);
+    validate_fees(lsi.fee_config());
+    let spread_fees_pre = lsi.fees();
 
-  invoke(target, lsi, system_state, ctx);
+    invoke(target, lsi, system_state, ctx);
 
-  let spread_fees_post = lsi.fees();
+    let spread_fees_post = lsi.fees();
 
-  let collected = target.name() == b"collect_fees";
-  let increased = spread_fees_post >= spread_fees_pre;
+    let collected = target.name() == b"collect_fees";
+    let increased = spread_fees_post >= spread_fees_pre;
 
-  // !collected -> increased <==> collected || increased
-  cvlm_assert(collected || increased);
+    // !collected -> increased <==> collected || increased
+    cvlm_assert(collected || increased);
 }
-
 
 public fun fees_dont_eat_redemption(
     lsi: &mut LiquidStakingInfo<DummyToken>,
