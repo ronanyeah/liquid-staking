@@ -37,7 +37,8 @@ jobs:
           ecosystem: sui
           working-directory: certora/spec/
           configurations: |-
-            confs/accounting_integrity.conf
+            confs/supply_control_decreases.conf
+            confs/supply_control_increases.conf
             confs/accounting_no_lst_no_sui.conf
             confs/accounting_total_sui_supply.conf
             confs/accounting_value_conservation.conf
