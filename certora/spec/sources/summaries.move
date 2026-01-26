@@ -240,8 +240,10 @@ public fun pool_token_exchange_rate_at_epoch(
     some(get_exr(epoch, &id)).destroy_some()
 }
 
+public native fun active_validators(): vector<address>;
+
 public fun active_validator_addresses(_wrapper: &mut SuiSystemState): vector<address> {
-    nondet()
+    active_validators()
 }
 
 public fun request_withdraw_stake_non_entry(

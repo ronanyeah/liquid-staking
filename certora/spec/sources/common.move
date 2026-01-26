@@ -1,18 +1,16 @@
 module spec::common;
 
-use liquid_staking::liquid_staking::LiquidStakingInfo;
-use sui_system::sui_system::SuiSystemState;
 use cvlm::asserts::cvlm_assume_msg;
 use cvlm::function::Function;
+use liquid_staking::liquid_staking::LiquidStakingInfo;
+use spec::summaries::{active_validators};
+use sui_system::sui_system::SuiSystemState;
+use liquid_staking::storage::inactive_stake;
+use liquid_staking::storage::get_sui_amount;
 
-
-public fun setup_fresh<T>(
+public fun setup<T>(
     lsi: &mut LiquidStakingInfo<T>,
-    system_state: &mut SuiSystemState,
-    ctx: &mut TxContext,
 ) {
-    cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Force refresh");
-
     let mut i = 0;
     while (i < lsi.storage().validators().length()) {
         let validator = &lsi.storage().validators()[i];
@@ -28,16 +26,67 @@ public fun setup_fresh<T>(
 
         i = i+1;
     };
-
-    lsi.refresh(system_state, ctx);
 }
+
+
+public fun setup_fresh<T>(
+    lsi: &mut LiquidStakingInfo<T>,
+    system_state: &mut SuiSystemState,
+    ctx: &mut TxContext,
+) {
+  
+    /*  Refresh */
+    let mut total_sui_supply = 0;
+
+    let validator_addresses = active_validators();
+
+    let mut i = 0;
+    while (i < lsi.storage().validators().length()) {
+        let validator = &lsi.storage().validators()[i];
+        let pool_id = validator.staking_pool_id();
+        let active = validator.active_stake();
+        let inactive = lsi.storage().validators()[i].inactive_stake();
+        
+        cvlm_assume_msg(inactive.is_none(), b"No inactive stake");
+        cvlm_assume_msg(active.is_some(), b"No empty validator");
+        let active = active.borrow();
+        cvlm_assume_msg(active.pool_id() == pool_id, b"Matching pool ids");
+       
+
+        cvlm_assume_msg(
+            validator_addresses.contains(&validator.validator_address()),
+            b"Validator is active",
+        );
+
+
+        // We assume an exchange rate for this epoch exists
+        let er = lsi
+            .storage()
+            .get_latest_exchange_rate(&validator.staking_pool_id(), system_state, ctx)
+            .destroy_some();
+        cvlm_assume_msg(validator.exchange_rate() == er, b"Validator has latest exchange rate");
+
+        let active_sui_amount = get_sui_amount(&er, active.value());
+        cvlm_assume_msg(validator.total_sui_amount() == active_sui_amount, b"Valid amount");
+
+        total_sui_supply = total_sui_supply + active_sui_amount;
+
+        i = i+1;
+    };
+    
+    cvlm_assume_msg(lsi.storage().total_sui_supply() == total_sui_supply, b"Correct total sui supply");
+    cvlm_assume_msg(lsi.storage().last_refresh_epoch() == ctx.epoch(), b"Set last refresh");
+    /* End Refresh */
+    
+}
+
 
 public fun log<T>(_: &T) {}
 
 public fun can_decrease_supply(f: Function): bool {
-  f.name() == b"redeem" || f.name() == b"custom_redeem"
+    f.name() == b"redeem" || f.name() == b"custom_redeem"
 }
 
 public fun can_increase_supply(f: Function): bool {
-  f.name() == b"mint"
+    f.name() == b"mint"
 }
