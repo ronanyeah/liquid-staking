@@ -1,10 +1,11 @@
 module spec::summaries;
 
-use cvlm::asserts::{cvlm_assume_msg};
+use cvlm::asserts::{cvlm_assume_msg, cvlm_assert};
 use cvlm::ghost::ghost_destroy;
 use cvlm::manifest::{summary, ghost};
 use cvlm::nondet::nondet;
 use liquid_staking::storage::{Self, Storage};
+use liquid_staking::version::Version;
 use std::option::some;
 use sui::balance::Balance;
 use sui::object::id;
@@ -12,7 +13,6 @@ use sui::sui::SUI;
 use sui::tx_context::epoch;
 use sui_system::staking_pool::{PoolTokenExchangeRate, StakedSui, StakingPool, FungibleStakedSui};
 use sui_system::sui_system::SuiSystemState;
-use cvlm::asserts::cvlm_assert;
 
 public fun cvlm_manifest() {
     ghost(b"exchange_rate");
@@ -32,7 +32,6 @@ public fun cvlm_manifest() {
         b"pool_token_exchange_rate_at_epoch",
     );
 
-
     ghost(b"fungible_total_supply");
     ghost(b"fungible_total_principal");
 
@@ -48,6 +47,7 @@ public fun cvlm_manifest() {
         b"sui_system",
         b"redeem_fungible_staked_sui",
     );
+    ghost(b"active_validators");
     summary(
         b"active_validator_addresses",
         @sui_system,
@@ -59,6 +59,13 @@ public fun cvlm_manifest() {
         @sui_system,
         b"sui_system",
         b"request_withdraw_stake_non_entry",
+    );
+
+    summary(
+        b"assert_version_and_upgrade",
+        @liquid_staking,
+        b"version",
+        b"assert_version_and_upgrade",
     );
 }
 
@@ -83,8 +90,6 @@ fun get_exr(epoch: u64, staking_pool_id: &ID): PoolTokenExchangeRate {
     cvlm_assume_msg(er.sui_amount() >= er.pool_token_amount(), b"solvent");
     er
 }
-
-
 
 native fun fungible_total_supply(pool: ID): &mut u64;
 native fun fungible_total_principal(pool: ID): &mut u64;
@@ -112,34 +117,28 @@ public fun convert_to_fungible_staked_sui(
     let f_principal = fungible_total_supply(id);
     *f_total = *f_total + pool_token_amount;
     *f_principal = *f_principal + principal;
-    
 
     ghost_destroy(staked_sui);
 
     fss
 }
 
-
 public fun redeem_fungible_staked_sui(
     _wrapper: &mut SuiSystemState,
     fungible_staked_sui: FungibleStakedSui,
     ctx: &TxContext,
 ): Balance<SUI> {
-    
     let id = fungible_staked_sui.pool_id();
     let epoch = ctx.epoch();
     let value = fungible_staked_sui.value();
 
     let principal = *fungible_total_principal(id);
     cvlm_assume_msg(principal >= value, b"");
-    
-    
+
     let total_supply = *fungible_total_supply(id);
     cvlm_assume_msg(total_supply >= principal, b"");
 
-
     let er = get_exr(epoch, &id);
-    
 
     // let (
     //     principal_amount,
@@ -151,7 +150,7 @@ public fun redeem_fungible_staked_sui(
     //     total_supply,
     // );
     //let total_withdraw = principal_amount+rewards_amount;
-    
+
     let total_withdraw = get_sui_amount(er, value);
 
     //fungible_staked_sui_data.total_supply = fungible_staked_sui_data.total_supply - value;
@@ -184,7 +183,10 @@ public(package) fun calculate_fungible_staked_sui_withdraw_amount(
     //     total_sui_amount,
     // );
 
-    cvlm_assume_msg(fungible_staked_sui_data_principal_amount <= total_sui_amount, b"Principal amount is less than total sui amount");
+    cvlm_assume_msg(
+        fungible_staked_sui_data_principal_amount <= total_sui_amount,
+        b"Principal amount is less than total sui amount",
+    );
 
     // 2. how much do we need to withdraw from the rewards pool?
     let total_rewards = total_sui_amount - fungible_staked_sui_data_principal_amount;
@@ -259,3 +261,5 @@ public fun request_withdraw_stake_non_entry(
     ghost_destroy(staked_sui);
     w
 }
+
+public(package) fun assert_version_and_upgrade(_version: &mut Version, _current_version: u16) {}
