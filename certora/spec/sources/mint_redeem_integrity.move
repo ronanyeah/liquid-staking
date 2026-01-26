@@ -1,4 +1,4 @@
-module spec::integrity;
+module spec::mint_redeem_integrity;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::ghost::ghost_destroy;
