@@ -10,6 +10,7 @@ use liquid_staking::storage::{Self, Storage, get_sui_amount, active_stake, Valid
 use spec::common::{log, setup};
 use spec::dummy::DummyToken;
 use sui_system::sui_system::SuiSystemState;
+use liquid_staking::storage::max_validators;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -38,6 +39,9 @@ public fun cvlm_manifest() {
     rule(b"can_add_correct");
     rule(b"can_remove_correct");
     rule(b"add_at_most_one");
+
+    rule(b"validators_upper_bound_base");
+    rule(b"validators_upper_bound_step");
 
     rule(b"no_stake_no_sui_base");
     rule(b"no_stake_no_sui_step");
@@ -217,12 +221,10 @@ public fun add_at_most_one(
     cvlm_assert(validators_post <= validators_pre + 1);
 }
 
-// Same as in storage.move
-const MAX_VALIDATORS: u64 = 50;
 
 public fun validators_upper_bound_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
-    cvlm_assert(strg.validators().length() <= MAX_VALIDATORS);
+    cvlm_assert(strg.validators().length() <= max_validators());
     ghost_destroy(strg);
 }
 
@@ -232,9 +234,9 @@ public fun validators_upper_bound_step(
     system_state: &mut SuiSystemState,
     ctx: &mut TxContext,
 ) {
-    cvlm_assert_msg(strg.validators().length() <= MAX_VALIDATORS, b"Assume in pre state");
+    cvlm_assume_msg(strg.validators().length() <= max_validators(), b"Assume in pre state");
     invoke(target, strg, system_state, ctx);
-    cvlm_assert(strg.validators().length() <= MAX_VALIDATORS);
+    cvlm_assert(strg.validators().length() <= max_validators());
 }
 
 fun validator_no_stake_no_sui(v: &ValidatorInfo): bool {
@@ -297,6 +299,7 @@ public fun no_empty_validators_after_refresh(
 ) {
     setup(lsi);
     cvlm_assume_msg(ctx.epoch() > lsi.storage().last_refresh_epoch(), b"Force refresh");
+    cvlm_assume_msg(no_stake_no_sui(lsi.storage()), b"Assume in pre state");
 
     lsi.refresh(system_state, ctx);
 

@@ -46,7 +46,10 @@ jobs:
             confs/fees.conf
             confs/mint_redeem_integrity.conf
             confs/solvency.conf
-            confs/validators_consistency.conf
+            confs/validators_consistency_p1.conf
+            confs/validators_consistency_p2.conf
+            confs/validators_consistency_p3.conf
+            confs/validators_consistency_p4.conf
           job-name: "Verification"
           certora-key: ${{ secrets.CERTORAKEY }}
         env:
