@@ -1,3 +1,11 @@
+/// Property: Fee Accounting Integrity
+/// Description: Verifies that the protocol's fee accounting maintains critical invariants across all
+/// operations. Accrued spread fees must never exceed the total SUI supply (preventing over-collection),
+/// fees must grow monotonically except during collection operations (ensuring they are not lost), and
+/// fees must never completely consume user deposits or redemptions (guaranteeing users always receive value).
+/// These properties ensure the fee mechanism operates correctly without compromising user funds or
+/// protocol accounting.
+
 module spec::fees;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -45,6 +53,8 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
+/// Base case: Verifies that for newly created pools, accrued spread fees do not exceed the total SUI supply.
+/// This establishes the initial state for the fee accounting invariant.
 public fun spread_fees_dont_exceed_sui_supply_base(
     ctx: &mut TxContext,
 ) {
@@ -60,6 +70,8 @@ public fun spread_fees_dont_exceed_sui_supply_base(
 
 }
 
+/// Inductive step: Verifies that all operations preserve the invariant that accrued spread fees
+/// do not exceed the total SUI supply. This prevents the protocol from claiming fees it cannot honor.
 public fun spread_fees_dont_exceed_sui_supply_step(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -82,6 +94,8 @@ public fun spread_fees_dont_exceed_sui_supply_step(
     cvlm_assert(spread_fees_post <= sui_post);
 }
 
+/// Verifies that accrued fees either remain constant or increase across all operations, except
+/// during explicit fee collection. This ensures fees are not lost or incorrectly reduced during operations.
 public fun fees_grow_monotonically(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -103,6 +117,8 @@ public fun fees_grow_monotonically(
     cvlm_assert(collected || increased);
 }
 
+/// Verifies that redemption fees do not completely consume the user's redemption, ensuring users
+/// always receive a non-zero amount of SUI when redeeming non-zero LST tokens.
 public fun fees_dont_eat_redemption(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -125,6 +141,8 @@ public fun fees_dont_eat_redemption(
     ghost_destroy(sui);
 }
 
+/// Verifies that deposit fees do not completely consume the user's deposit, ensuring users
+/// always receive a non-zero amount of LST tokens when depositing non-zero SUI.
 public fun fees_dont_eat_deposit(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,

@@ -1,3 +1,11 @@
+/// Property: Protocol Solvency and Exchange Rate Monotonicity
+/// Description: Verifies that the liquid staking protocol maintains solvency throughout its lifecycle,
+/// ensuring that the SUI backing always meets or exceeds the LST supply (maintaining an exchange rate >= 1).
+/// Additionally, this property verifies that the SUI/LST exchange rate is non-decreasing across operations,
+/// protecting users from value dilution. Solvency is established at initialization and preserved through
+/// induction across all state-modifying operations. The monotonic exchange rate ensures that LST tokens
+/// never lose purchasing power relative to SUI over time.
+
 module spec::solvency;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -50,6 +58,8 @@ native fun invoke(
 
 
 
+/// Checks whether the protocol is solvent by verifying that the total SUI backing is at least
+/// equal to the total LST supply. This ensures the exchange rate (SUI/LST) is at least 1:1.
 /// lsi.total_sui_supply()/lsi.total_lst_supply() >= 1
 /// <==> lsi.total_sui_supply() >= lsi.total_lst_supply()
 public fun is_solvent<T>(lsi: &LiquidStakingInfo<T>): bool {
@@ -59,7 +69,8 @@ public fun is_solvent<T>(lsi: &LiquidStakingInfo<T>): bool {
     sui_supply >= lst_supply
 }
 
-/// The base case for the induction.
+/// Base case: Verifies that newly created empty liquid staking pools are solvent.
+/// This establishes the initial solvency invariant at pool creation.
 public fun solvency_base<P: drop>() {
     let fee_config = nondet();
     let lst_treasury_cap = nondet();
@@ -72,7 +83,8 @@ public fun solvency_base<P: drop>() {
     ghost_destroy(lsi);
 }
 
-/// The base case for the induction.
+/// Base case: Verifies that newly created liquid staking pools initialized with existing stake are solvent.
+/// This establishes the initial solvency invariant for pools created with pre-existing staked SUI.
 public fun solvency_base_staker<P: drop>() {
     let fee_config = nondet();
     let mut system_state = nondet();
@@ -97,7 +109,8 @@ public fun solvency_base_staker<P: drop>() {
 }
 
 
-/// The induction steps for the solvency invariant.
+/// Inductive step: Verifies that all state-modifying operations preserve protocol solvency.
+/// Assumes the protocol is solvent in the pre-state and proves it remains solvent after the operation.
 public fun solvency_step(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -144,6 +157,9 @@ public fun insolvency_bound(
 }
 
 
+/// Verifies that the SUI/LST exchange rate is non-decreasing across all operations.
+/// This ensures LST holders never experience value dilution, as each LST token can always be
+/// redeemed for at least as much SUI as it could previously.
 public fun monotonicity(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,

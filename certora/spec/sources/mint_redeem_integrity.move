@@ -1,3 +1,10 @@
+/// Property: Mint and Redemption Integrity
+/// Description: Ensures the core deposit and withdrawal operations maintain fundamental integrity properties.
+/// Users depositing non-zero amounts must receive non-zero value in return (either LST tokens or SUI plus fees),
+/// preventing complete value loss. Additionally, this property verifies that there are no arbitrage opportunities
+/// where a user could mint LST and immediately redeem it for more SUI than initially deposited. These guarantees
+/// ensure fair pricing and protect users from loss of funds during the fundamental protocol operations.
+
 module spec::mint_redeem_integrity;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -23,6 +30,8 @@ public fun cvlm_manifest() {
     //rule(b"redemption_liveness");
 }
 
+/// Verifies that redeeming a non-zero amount of LST tokens always results in receiving non-zero
+/// total value (SUI returned plus fees), preventing complete loss of user funds during redemption.
 public fun no_lost_funds_on_redeem(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -49,6 +58,8 @@ public fun no_lost_funds_on_redeem(
 
 
 
+/// Verifies that depositing a non-zero amount of SUI always results in receiving non-zero total
+/// value (LST tokens plus fees), preventing complete loss of user funds during minting.
 public fun no_lost_funds_on_mint(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -85,6 +96,8 @@ public fun redemption_liveness(lsi: &mut LiquidStakingInfo<DummyToken>,
 }
 
 
+/// Verifies that no arbitrage opportunity exists where a user could deposit SUI, immediately redeem
+/// the received LST tokens, and receive more SUI than initially deposited. This ensures fair pricing.
 public fun no_arbitrage_opportunity(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,

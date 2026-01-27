@@ -1,3 +1,9 @@
+/// Property: Token Supply Initialization Invariants
+/// Description: Verifies that the liquid staking protocol maintains proper relationships between
+/// LST (liquid staking token) and SUI supply. Specifically, this
+/// ensures that an empty LST supply implies an empty SUI reserve (preventing orphaned SUI), and
+/// conversely, that an empty SUI reserve implies no outstanding LST tokens (preventing unbacked tokens).
+
 module spec::accounting_no_lst_no_sui;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -47,6 +53,8 @@ native fun invoke(
 );
 
 
+/// Checks that if there is no LST supply, then there is no SUI supply.
+/// This prevents orphaned SUI that cannot be claimed through LST tokens.
 public fun no_lst_no_sui<P>(lsi: &LiquidStakingInfo<P>): bool {
   let lst = lsi.total_lst_supply();
   let sui = lsi.total_sui_supply();
@@ -54,6 +62,8 @@ public fun no_lst_no_sui<P>(lsi: &LiquidStakingInfo<P>): bool {
   lst != 0 || sui == 0
 }
 
+/// Checks that if there is no SUI supply, then there is no LST supply.
+/// This prevents unbacked LST tokens that cannot be redeemed for SUI.
 public fun no_sui_no_lst<P>(lsi: &LiquidStakingInfo<P>): bool {
   let lst = lsi.total_lst_supply();
   let sui = lsi.total_sui_supply();
@@ -61,6 +71,8 @@ public fun no_sui_no_lst<P>(lsi: &LiquidStakingInfo<P>): bool {
   sui != 0 || lst == 0
 }
 
+/// Base case: Verifies that newly created liquid staking pools (both empty and with initial stake)
+/// satisfy the invariant that zero LST supply implies zero SUI supply.
 public fun no_lst_no_sui_base(
     ctx: &mut TxContext,
 ) {
@@ -86,6 +98,9 @@ public fun no_lst_no_sui_base(
 
 }
 
+/// Inductive step: Verifies that all state-modifying operations preserve the invariant that
+/// zero LST supply implies zero SUI supply. Assumes the system is solvent and has correct accounting
+/// in the pre-state.
 public fun no_lst_no_sui_step(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -114,6 +129,8 @@ public fun no_lst_no_sui_step(
 }
 
 
+/// Base case: Verifies that newly created liquid staking pools (both empty and with initial stake)
+/// satisfy the invariant that zero SUI supply implies zero LST supply.
 public fun no_sui_no_lst_base(
     ctx: &mut TxContext,
 ) {
@@ -139,6 +156,9 @@ public fun no_sui_no_lst_base(
 
 }
 
+/// Inductive step: Verifies that all state-modifying operations preserve the invariant that
+/// zero SUI supply implies zero LST supply. Assumes the system is solvent and has correct accounting
+/// in the pre-state.
 public fun no_sui_no_lst_step(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,

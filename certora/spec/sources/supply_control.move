@@ -1,3 +1,10 @@
+/// Property: Supply Control Authorization
+/// Description: Enforces strict access control on token supply modifications by verifying that only
+/// authorized operations can increase or decrease the SUI and LST supplies. Specifically, only mint
+/// operations can increase supplies, and only redemption operations can decrease supplies. This prevents
+/// unauthorized minting or burning of tokens through administrative or operational functions, ensuring
+/// that supply changes only occur through the intended user-facing deposit and withdrawal flows.
+
 module spec::supply_control;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -42,6 +49,8 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
+/// Verifies that only authorized redemption operations can decrease the total SUI supply.
+/// This prevents unauthorized withdrawal of SUI backing through non-redemption functions.
 public fun only_redemption_decreases_sui_supply(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -64,6 +73,8 @@ public fun only_redemption_decreases_sui_supply(
     cvlm_assert(!decreased || can_decrease_supply(target));
 }
 
+/// Verifies that only authorized redemption operations can decrease the total LST supply.
+/// This prevents unauthorized burning of LST tokens through non-redemption functions.
 public fun only_redemption_decreases_lst_supply(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -83,6 +94,8 @@ public fun only_redemption_decreases_lst_supply(
     cvlm_assert(!decreased || can_decrease_supply(target));
 }
 
+/// Verifies that only authorized mint operations can increase the total LST supply.
+/// This prevents unauthorized creation of LST tokens through non-mint functions.
 public fun only_minting_increases_lst_supply(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -104,6 +117,8 @@ public fun only_minting_increases_lst_supply(
     cvlm_assert(!increased || can_increase_supply(target));
 }
 
+/// Verifies that only authorized mint operations can increase the total SUI supply backing.
+/// This prevents unauthorized injection of SUI backing through non-mint functions.
 public fun only_minting_increases_sui_supply(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,

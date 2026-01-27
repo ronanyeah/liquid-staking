@@ -1,3 +1,11 @@
+/// Property: Value Conservation
+/// Description: Ensures that the liquid staking protocol conserves value across all operations.
+/// For operations that do not involve deposits or redemptions, the total SUI and LST supplies must
+/// be non-decreasing. For mint operations, the deposited SUI value must equal the sum of the LST backing
+/// increase and protocol fees collected. For redeem operations, the burned LST value must equal the sum
+/// of SUI returned to users and protocol fees. This comprehensive value conservation prevents any loss
+/// or creation of value through protocol operations.
+
 module spec::accounting_value_conservation;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -43,6 +51,8 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
+/// Verifies that for operations that cannot decrease SUI supply (non-redemption operations),
+/// the total SUI backing remains non-decreasing. This prevents unauthorized SUI withdrawals.
 public fun sui_value_conservation(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -61,6 +71,8 @@ public fun sui_value_conservation(
     cvlm_assert(sui_post >= sui_pre);
 }
 
+/// Verifies that for operations that cannot decrease LST supply (non-redemption operations),
+/// the total LST supply remains non-decreasing. This prevents unauthorized token burns.
 public fun lst_value_conservation(
     target: Function,
     lsi: &mut LiquidStakingInfo<DummyToken>,
@@ -77,6 +89,8 @@ public fun lst_value_conservation(
     cvlm_assert(lst_post >= lst_pre);
 }
 
+/// Verifies that during mint operations, the deposited SUI value is fully accounted for as either
+/// an increase in the SUI backing or as protocol fees. This ensures no value is lost during deposits.
 public fun deposit_value_conservation(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -101,6 +115,8 @@ public fun deposit_value_conservation(
     ghost_destroy(lst);
 }
 
+/// Verifies that during redemption operations, the decrease in SUI backing equals the sum of
+/// SUI returned to the user and protocol fees collected. This ensures no value is lost during redemptions.
 public fun redeem_value_conservation(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,

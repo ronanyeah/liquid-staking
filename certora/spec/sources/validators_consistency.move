@@ -1,6 +1,15 @@
+/// Property: Validator Registry Consistency
+/// Description: Ensures the internal validator registry maintains structural invariants critical for
+/// correct protocol operation. The total SUI supply tracked in storage must equal the sum of SUI across
+/// all validators plus the liquid pool. The registry must not contain duplicate validators (preventing
+/// double-counting of stake), and validators can only be added or removed through authorized operations.
+/// After refresh operations, the registry must contain no inactive stake or empty validator entries,
+/// ensuring clean state. These properties guarantee accurate stake accounting and prevent inconsistencies
+/// in the validator management system.
+
 module spec::validators_consistency;
 
-use cvlm::asserts::{cvlm_assert, cvlm_assume_msg, cvlm_assert_msg};
+use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
 use cvlm::ghost::ghost_destroy;
 use cvlm::manifest::{target, invoker, rule};
@@ -99,6 +108,8 @@ fun current_supply(strg: &Storage): u64 {
     v
 }
 
+/// Base case: Verifies that for newly created storage, the total SUI supply equals the computed
+/// sum across all validators and the liquid pool.
 public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
     let supply = current_supply(&strg);
@@ -107,6 +118,8 @@ public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
     ghost_destroy(strg);
 }
 
+/// Inductive step: Verifies that all storage operations preserve the invariant that total SUI supply
+/// equals the sum across validators and the liquid pool, ensuring accurate accounting.
 public fun total_sui_supply_correct_step(
     target: Function,
     strg: &mut Storage,
@@ -140,6 +153,8 @@ fun can_remove_validator(target: Function): bool {
     target.name() == b"refresh"
 }
 
+/// Verifies that validators can only be added to the registry through explicitly authorized operations
+/// (staking operations and direct validator addition), preventing unauthorized registry modifications.
 public fun can_add_correct(
     target: Function,
     strg: &mut Storage,
@@ -156,6 +171,8 @@ public fun can_add_correct(
     cvlm_assert(!appended || allowed);
 }
 
+/// Verifies that validators can only be removed from the registry through the refresh operation,
+/// which cleans up empty validators, preventing unauthorized validator removal.
 public fun can_remove_correct(
     target: Function,
     strg: &mut Storage,
@@ -172,6 +189,8 @@ public fun can_remove_correct(
     cvlm_assert(!removed || allowed);
 }
 
+/// Verifies that adding a validator to the registry only occurs if neither its staking pool ID
+/// nor its validator address already exists, preventing duplicate entries and double-counting.
 public fun no_duplicate_validators(
     strg: &mut Storage,
     staking_pool_id: ID,
@@ -208,6 +227,8 @@ public fun no_duplicate_validators(
     cvlm_assert(!appended || (!id_exists && !address_exists ));
 }
 
+/// Verifies that any single operation can add at most one validator to the registry,
+/// preventing bulk additions that could bypass validation logic.
 public fun add_at_most_one(
     target: Function,
     strg: &mut Storage,
@@ -257,12 +278,16 @@ fun no_stake_no_sui(strg: &Storage): bool {
     ret
 }
 
+/// Base case: Verifies that for newly created storage, validators with no active or inactive stake
+/// have zero total SUI amount recorded.
 public fun no_stake_no_sui_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
     cvlm_assert(no_stake_no_sui(&strg));
     ghost_destroy(strg);
 }
 
+/// Inductive step: Verifies that all operations preserve the invariant that validators with no
+/// active or inactive stake have zero total SUI recorded, preventing phantom stake.
 public fun no_stake_no_sui_step(
     target: Function,
     strg: &mut Storage,
@@ -275,6 +300,8 @@ public fun no_stake_no_sui_step(
     cvlm_assert(no_stake_no_sui(strg));
 }
 
+/// Verifies that after a refresh operation completes, no validators in the registry contain
+/// inactive stake, ensuring all stake has been properly activated or removed.
 public fun no_inactive_stake_after_refresh(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,
@@ -292,6 +319,8 @@ public fun no_inactive_stake_after_refresh(
     cvlm_assert(inactive.is_none());
 }
 
+/// Verifies that after a refresh operation completes, no validators in the registry are empty
+/// (containing no stake), ensuring clean state and accurate registry size.
 public fun no_empty_validators_after_refresh(
     lsi: &mut LiquidStakingInfo<DummyToken>,
     system_state: &mut SuiSystemState,

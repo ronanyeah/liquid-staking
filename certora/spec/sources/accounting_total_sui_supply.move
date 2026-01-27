@@ -1,3 +1,11 @@
+/// Property: Total SUI Supply Accounting Accuracy
+/// Description: Verifies that the total SUI supply tracked by the storage module precisely matches
+/// the sum of all SUI held across different locations: the liquid pool, active stake across all validators,
+/// and inactive stake awaiting activation. This property ensures that the protocol's internal accounting
+/// accurately reflects the actual SUI holdings, preventing discrepancies that could lead to insolvency
+/// or incorrect exchange rate calculations. The invariant is maintained across all storage operations
+/// through inductive verification.
+
 module spec::accounting_total_sui_supply;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
@@ -38,6 +46,7 @@ native fun invoke(
     ctx: &mut TxContext,
 );
 
+/// Computes the SUI value of active stake for a specific validator, accounting for exchange rate.
 fun staked_active(strg: &Storage, i: u64): u64 {
     let validator_info = &strg.validators()[i];
     if (validator_info.active_stake().is_some()) {
@@ -51,6 +60,7 @@ fun staked_active(strg: &Storage, i: u64): u64 {
     }
 }
 
+/// Computes the SUI value of inactive stake for a specific validator.
 fun staked_inactive(strg: &Storage, i: u64): u64 {
     let validator_info = &strg.validators()[i];
     if (validator_info.inactive_stake().is_some()) {
@@ -61,6 +71,7 @@ fun staked_inactive(strg: &Storage, i: u64): u64 {
     }
 }
 
+/// Computes the total SUI value (active + inactive) for a specific validator.
 fun validator_sui_supply(strg: &Storage, i: u64): u64 {
     let active_stake = staked_active(strg, i);
     let inactive_stake = staked_inactive(strg, i);
@@ -68,6 +79,8 @@ fun validator_sui_supply(strg: &Storage, i: u64): u64 {
     active_stake + inactive_stake
 }
 
+/// Computes the actual total SUI supply by summing the liquid pool and all validator stakes.
+/// This is the ground truth used to verify the stored total_sui_supply value.
 fun current_supply(strg: &Storage): u64 {
     let mut i = 0;
     let mut v = strg.sui_pool().value();
@@ -79,18 +92,23 @@ fun current_supply(strg: &Storage): u64 {
     v
 }
 
+/// Checks whether the stored total SUI supply matches the computed actual supply across all locations.
 public fun total_supply_correct(strg: &Storage): bool {
     let expected = current_supply(strg);
     let actual  = strg.total_sui_supply();
     expected == actual
 }
 
+/// Base case: Verifies that newly created storage has correct total SUI supply accounting,
+/// establishing the initial state for the invariant.
 public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
     cvlm_assert(total_supply_correct(&strg));
     ghost_destroy(strg);
 }
 
+/// Inductive step: Verifies that all storage operations preserve the invariant that the stored
+/// total SUI supply matches the actual sum across all locations. Ensures accounting accuracy is maintained.
 public fun total_sui_supply_correct_step(
     target: Function,
     strg: &mut Storage,
