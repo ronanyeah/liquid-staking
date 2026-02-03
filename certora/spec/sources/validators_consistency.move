@@ -1,11 +1,9 @@
 /// Property: Validator Registry Consistency
 /// Description: Ensures the internal validator registry maintains structural invariants critical for
-/// correct protocol operation. Validates that: (1) validators can only be added through authorized
-/// staking operations, preventing unauthorized registry modifications; (2) validators can only be
-/// removed through refresh operations; (3) at most one validator can be added per operation; (4) no
-/// duplicate validators exist by staking pool ID or validator address; (5) the registry size never
-/// exceeds the maximum validators limit; (6) validators with no active or inactive stake have zero
-/// total SUI recorded; (7) after refresh, no inactive stake or empty validators remain in the registry.
+/// correct protocol operation. Validates that: (1) no duplicate validators exist by staking pool ID
+/// or validator address; (2) the registry size never exceeds the maximum validators limit; (3) after
+/// any operation followed by refresh, validators with no active or inactive stake have zero total SUI
+/// recorded, preventing phantom stake.
 /// These properties guarantee accurate stake accounting and structural integrity of the validator management system.
 
 module spec::validators_consistency;
@@ -40,10 +38,7 @@ public fun cvlm_manifest() {
     invoker(b"invoke");
 
     rule(b"no_duplicate_validators");
-    rule(b"can_add_correct");
-    rule(b"can_remove_correct");
-    rule(b"add_at_most_one");
-
+    
     rule(b"validators_upper_bound_base");
     rule(b"validators_upper_bound_step");
 
@@ -99,12 +94,15 @@ public fun no_duplicate_validators(
 }
 
 
+/// Base case: Verifies that newly created storage has a validator count within the maximum limit.
 public fun validators_upper_bound_base(ctx: &mut TxContext) {
     let strg = storage::new(ctx);
     cvlm_assert(strg.validators().length() <= max_validators());
     ghost_destroy(strg);
 }
 
+/// Inductive step: Verifies that all operations preserve the invariant that the validator count
+/// never exceeds the maximum validators limit.
 public fun validators_upper_bound_step(
     target: Function,
     strg: &mut Storage,

@@ -1,14 +1,13 @@
-/// Property: Validator Registry Consistency
-/// Description: Ensures the internal validator registry maintains structural invariants critical for
-/// correct protocol operation. Validates that: (1) validators can only be added through authorized
-/// staking operations, preventing unauthorized registry modifications; (2) validators can only be
-/// removed through refresh operations; (3) at most one validator can be added per operation; (4) no
-/// duplicate validators exist by staking pool ID or validator address; (5) the registry size never
-/// exceeds the maximum validators limit; (6) validators with no active or inactive stake have zero
-/// total SUI recorded; (7) after refresh, no inactive stake or empty validators remain in the registry.
-/// These properties guarantee accurate stake accounting and structural integrity of the validator management system.
+/// Property: Validator Registry Integrity
+/// Description: Verifies integrity properties of validator registry operations. Rules check that:
+/// (1) validators can only be added through authorized staking operations (join_stake, join_fungible_stake)
+/// or explicit validator addition (get_or_add_validator_index_by_staking_pool_id_mut), preventing
+/// unauthorized registry modifications; (2) validators can only be removed through refresh operations;
+/// (3) at most one validator can be added per operation; (4) after refresh, no inactive stake remains
+/// in the registry; (5) after refresh, no empty validators remain in the registry.
+/// These rules verify correct authorization and post-conditions for validator registry modifications.
 
-module spec::integrity;
+module spec::validators_integrity;
 
 use cvlm::asserts::{cvlm_assert, cvlm_assume_msg};
 use cvlm::function::Function;
