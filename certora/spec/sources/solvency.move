@@ -123,8 +123,6 @@ public fun solvency_step(
     );
     setup_fresh(lsi, system_state, ctx);
 
-    // cvlm_assume_msg(lsi.accrued_spread_fees() == 0, b"No fees");
-    // cvlm_assume_msg(lsi.total_lst_supply() <= 10000 && lsi.total_lst_supply() <= 10000, b"Reasonable values for CEX");
     cvlm_assume_msg(is_solvent(lsi), b"Assume solvency in pre state");
     cvlm_assume_msg(total_supply_correct(lsi.storage()), b"Correct accounting");
 

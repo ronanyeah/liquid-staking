@@ -44,12 +44,11 @@ jobs:
             confs/accounting_total_sui_supply.conf
             confs/accounting_value_conservation.conf
             confs/fees.conf
-            confs/mint_redeem_integrity.conf
+            confs/no_arbitrage.conf
             confs/solvency.conf
             confs/validators_consistency_p1.conf
             confs/validators_consistency_p2.conf
-            confs/validators_consistency_p3.conf
-            confs/validators_consistency_p4.conf
+            confs/validators_integrity.conf
           job-name: "Verification"
           certora-key: ${{ secrets.CERTORAKEY }}
         env:
