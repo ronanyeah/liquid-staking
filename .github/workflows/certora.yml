@@ -31,7 +31,7 @@ jobs:
           sui move -V
       - name: Apply patch
         run: ./certora/munges/munge.sh
-      - name: Submit Jobs to Certora Prover
+      - name: Submit Jobs to Certora Prover (Part I)
         uses: Certora/certora-run-action@v2
         with:
           ecosystem: sui
@@ -44,6 +44,16 @@ jobs:
             confs/accounting_total_sui_supply.conf
             confs/accounting_value_conservation.conf
             confs/fees.conf
+          job-name: "Verification"
+          certora-key: ${{ secrets.CERTORAKEY }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Submit Jobs to Certora Prover (Part II)
+        uses: Certora/certora-run-action@v2
+        with:
+          ecosystem: sui
+          working-directory: certora/spec/
+          configurations: |-
             confs/no_arbitrage.conf
             confs/solvency.conf
             confs/validators_consistency_p1.conf
