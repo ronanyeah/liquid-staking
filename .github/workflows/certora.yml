@@ -44,7 +44,7 @@ jobs:
             confs/accounting_total_sui_supply.conf
             confs/accounting_value_conservation.conf
             confs/fees.conf
-          job-name: "Verification"
+          job-name: "Verification Part I"
           certora-key: ${{ secrets.CERTORAKEY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,7 +59,7 @@ jobs:
             confs/validators_consistency_p1.conf
             confs/validators_consistency_p2.conf
             confs/validators_integrity.conf
-          job-name: "Verification"
+          job-name: "Verification Part II"
           certora-key: ${{ secrets.CERTORAKEY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
