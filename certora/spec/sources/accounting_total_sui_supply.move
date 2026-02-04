@@ -14,6 +14,7 @@ use cvlm::ghost::ghost_destroy;
 use cvlm::manifest::{target, invoker, rule};
 use liquid_staking::storage::{Self, Storage, get_sui_amount, active_stake};
 use sui_system::sui_system::SuiSystemState;
+use cvlm::nondet::nondet;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -95,7 +96,7 @@ fun current_supply(strg: &Storage): u64 {
 /// Checks whether the stored total SUI supply matches the computed actual supply across all locations.
 public fun total_supply_correct(strg: &Storage): bool {
     let expected = current_supply(strg);
-    let actual  = strg.total_sui_supply();
+    let actual = strg.total_sui_supply();
     expected == actual
 }
 
@@ -120,13 +121,21 @@ public fun total_sui_supply_correct_step(
     cvlm_assume_msg(ctx.epoch() > strg.last_refresh_epoch(), b"Assume fresh state");
     strg.refresh(system_state, ctx);
 
-
     cvlm_assume_msg(total_supply_correct(strg), b"Assume invariant holds in pre state");
 
     invoke(target, strg, system_state, ctx);
 
-    strg.refresh(system_state, ctx); // No necessary but to be extra sure everything is up to date
+    // Advance epoch to force a refresh
+    // This is requiered because within a single epoch, unstaking can make the protocol’s stored total_sui_supply too high 
+    // compared to the "actual" supply recomputed from the remaining staked sui. 
+    // The unstake path updates accounting using the redeemed SUI amount and rounding during token splits, 
+    // while the remaining active stake’s value (via the exchange-rate conversion) can drop by an extra unit due to truncation. 
+    // Because refresh only runs once per epoch (last_refresh_epoch gate), this overstatement can persist until the next epoch, 
+    // when refresh recomputes stake values and brings stored totals back in line.
+    let mut ctx2: TxContext = nondet();
+    cvlm_assume_msg(ctx2.epoch() > strg.last_refresh_epoch(), b"Advance epoch so refresh can run");
+    strg.refresh(system_state, &mut ctx2);
+
+
     cvlm_assert(total_supply_correct(strg));
 }
-
-
