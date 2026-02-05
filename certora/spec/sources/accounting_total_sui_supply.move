@@ -110,6 +110,14 @@ public fun total_sui_supply_correct_base(ctx: &mut TxContext) {
 
 /// Inductive step: Verifies that all storage operations preserve the invariant that the stored
 /// total SUI supply matches the actual sum across all locations. Ensures accounting accuracy is maintained.
+///
+/// Note: This invariant only holds across epoch boundaries after refresh, as accounting can
+/// temporarily drift within an epoch. The drift occurs because refresh_validator_info sets
+/// total_sui_amount via get_sui_amount(...) which floors division, while unstaking paths (calling
+/// redeem_and_update_accounting) debit total_sui_supply by the actual redeemed SUI from
+/// redeem_fungible_staked_sui. Since flooring is not additive, partial unstakes can leave dust,
+/// causing the stored total_sui_supply to be higher than the recomputed actual supply until refresh()
+/// recomputes and reconciles it at the next epoch boundary.
 public fun total_sui_supply_correct_step(
     target: Function,
     strg: &mut Storage,
@@ -125,13 +133,7 @@ public fun total_sui_supply_correct_step(
 
     invoke(target, strg, system_state, ctx);
 
-    // Advance epoch to force a refresh
-    // This is requiered because within a single epoch, unstaking can make the protocol’s stored total_sui_supply too high 
-    // compared to the "actual" supply recomputed from the remaining staked sui. 
-    // The unstake path updates accounting using the redeemed SUI amount and rounding during token splits, 
-    // while the remaining active stake’s value (via the exchange-rate conversion) can drop by an extra unit due to truncation. 
-    // Because refresh only runs once per epoch (last_refresh_epoch gate), this overstatement can persist until the next epoch, 
-    // when refresh recomputes stake values and brings stored totals back in line.
+    // Force refresh at next epoch boundary to verify invariant holds
     let mut ctx2: TxContext = nondet();
     cvlm_assume_msg(ctx2.epoch() > strg.last_refresh_epoch(), b"Advance epoch so refresh can run");
     strg.refresh(system_state, &mut ctx2);

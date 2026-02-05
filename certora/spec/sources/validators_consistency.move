@@ -16,6 +16,7 @@ use liquid_staking::storage::{Self, Storage, active_stake, ValidatorInfo};
 use spec::common::{log};
 use sui_system::sui_system::SuiSystemState;
 use liquid_staking::storage::max_validators;
+use cvlm::nondet::nondet;
 
 public fun cvlm_manifest() {
     // Public mut functions
@@ -142,6 +143,14 @@ public fun no_stake_no_sui_base(ctx: &mut TxContext) {
 
 /// Inductive step: Verifies that all operations preserve the invariant that validators with no
 /// active or inactive stake have zero total SUI recorded, preventing phantom stake.
+///
+/// Note: This invariant only holds across epoch boundaries after refresh, as accounting can
+/// temporarily drift within an epoch. The drift occurs because refresh_validator_info sets
+/// total_sui_amount via get_sui_amount(...) which floors division, while unstaking paths (calling
+/// redeem_and_update_accounting) debit total_sui_amount by the actual redeemed SUI from
+/// redeem_fungible_staked_sui. Since flooring is not additive, partial unstakes can leave dust,
+/// and after the last stake object is removed, total_sui_amount may still be > 0 until refresh()
+/// recomputes and zeroes it at the next epoch boundary.
 public fun no_stake_no_sui_step(
     target: Function,
     strg: &mut Storage,
@@ -150,7 +159,13 @@ public fun no_stake_no_sui_step(
 ) {
     cvlm_assume_msg(no_stake_no_sui(strg), b"Assume in pre state");
     invoke(target, strg, system_state, ctx);
-    strg.refresh(system_state, ctx);
+
+    // Force refresh at next epoch boundary to verify invariant holds
+    let mut ctx2: TxContext = nondet();
+    cvlm_assume_msg(ctx2.epoch() < ctx.epoch(), b"Force refresh");
+    strg.refresh(system_state, &mut ctx2);
+    
+
     cvlm_assert(no_stake_no_sui(strg));
 }
 
