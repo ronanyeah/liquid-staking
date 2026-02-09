@@ -2,8 +2,8 @@
 /// Description: Ensures the internal validator registry maintains structural invariants critical for
 /// correct protocol operation. Validates that: (1) no duplicate validators exist by staking pool ID
 /// or validator address; (2) the registry size never exceeds the maximum validators limit; (3) after
-/// any operation followed by refresh, validators with no active or inactive stake have zero total SUI
-/// recorded, preventing phantom stake.
+/// any operation followed by a forced epoch transition and refresh, validators with no active or inactive
+/// stake have zero total SUI recorded, preventing phantom stake across epoch boundaries.
 /// These properties guarantee accurate stake accounting and structural integrity of the validator management system.
 
 module spec::validators_consistency;

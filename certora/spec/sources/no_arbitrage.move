@@ -37,7 +37,7 @@ public fun no_arbitrage_opportunity(
     validate_fees(lsi.fee_config());
     
     // The rule fails if we have 0 LST but non-zero SUI supply
-    // This state, however, should not be possible to reach (check rule `no_lst_no_sui` in `solvency.move`)
+    // This state, however, is not reachable (check rule `no_lst_no_sui` in `solvency.move`)
     cvlm_assume_msg(lsi.total_lst_supply() != 0 || lsi.total_sui_supply() == 0, b"No LST means no SUI supply");
 
     let sui_in: Coin<SUI> = nondet();
