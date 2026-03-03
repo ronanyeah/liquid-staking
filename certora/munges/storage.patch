@@ -1,5 +1,5 @@
 diff --git a/contracts/sources/storage.move b/contracts/sources/storage.move
-index d3de10c..1d51580 100644
+index e729823..1023707 100644
 --- a/contracts/sources/storage.move
 +++ b/contracts/sources/storage.move
 @@ -15,9 +15,13 @@ module liquid_staking::storage {
@@ -16,9 +16,9 @@ index d3de10c..1d51580 100644
 +
      /// The Storage struct holds all stake for the LST.
      public struct Storage has store {
-         /// Sui balance. Unstake operations deposit SUI here. 
+         /// Sui balance. Unstake operations deposit SUI here.
 @@ -51,7 +55,7 @@ module liquid_staking::storage {
-         extra_fields: Bag
+         extra_fields: Bag,
      }
  
 -    public(package) fun new(ctx: &mut TxContext): Storage {
@@ -84,7 +84,7 @@ index d3de10c..1d51580 100644
          self.total_sui_amount
      }
  
-@@ -115,7 +123,7 @@ module liquid_staking::storage {
+@@ -118,7 +126,7 @@ module liquid_staking::storage {
          i
      }
  
@@ -93,17 +93,23 @@ index d3de10c..1d51580 100644
          self.active_stake.is_none() && self.inactive_stake.is_none() && self.total_sui_amount == 0
      }
  
-@@ -126,7 +134,7 @@ module liquid_staking::storage {
+@@ -129,10 +137,10 @@ module liquid_staking::storage {
      /// - Moves any inactive stake that can be converted to active stake.
      /// - Removes validators that have no stake.
      /// Returns true if the storage was updated.
 -    public(package) fun refresh(
+-        self: &mut Storage,
+-        system_state: &mut SuiSystemState,
+-        ctx: &mut TxContext,
 +    public fun refresh(
-         self: &mut Storage, 
-         system_state: &mut SuiSystemState, 
-         ctx: &mut TxContext
-@@ -189,7 +197,7 @@ module liquid_staking::storage {
-     // this may return none in the case where the staking pool is inactive or 
++        self: &mut Storage, 
++        system_state: &mut SuiSystemState, 
++        ctx: &mut TxContext
+     ): bool {
+         if (self.last_refresh_epoch == ctx.epoch()) {
+             return false
+@@ -197,7 +205,7 @@ module liquid_staking::storage {
+     // this may return none in the case where the staking pool is inactive or
      // if sui system is currently in safe mode. In both these cases, the storage
      // object has the latest exchange rate already.
 -    fun get_latest_exchange_rate(
@@ -111,9 +117,9 @@ index d3de10c..1d51580 100644
          self: &Storage,
          staking_pool_id: &ID,
          system_state: &mut SuiSystemState,
-@@ -211,10 +219,9 @@ module liquid_staking::storage {
+@@ -219,10 +227,9 @@ module liquid_staking::storage {
  
-     /// Update the total sui amount for the validator and modify the 
+     /// Update the total sui amount for the validator and modify the
      /// storage sui supply accordingly assumes the exchange rate is up to date
 -    fun refresh_validator_info(self: &mut Storage, i: u64) {
 +    public fun refresh_validator_info(self: &mut Storage, i: u64) {
@@ -123,26 +129,18 @@ index d3de10c..1d51580 100644
          let mut total_sui_amount = 0;
          if (validator_info.active_stake.is_some()) {
              let active_stake = validator_info.active_stake.borrow();
-@@ -390,7 +397,8 @@ module liquid_staking::storage {
-                 ((target_unstake_sui_amount as u128)
-                     * (fungible_staked_sui_amount as u128)
-                     + (total_sui_amount as u128)
--                    - 1)
-+                    - 1
-+                    )
-                 / (total_sui_amount as u128)
-             ) as u64;
- 
-@@ -543,7 +551,7 @@ module liquid_staking::storage {
+@@ -568,8 +575,8 @@ module liquid_staking::storage {
      }
  
      /* Private functions */
 -    fun get_or_add_validator_index_by_staking_pool_id_mut(
+-        self: &mut Storage,
 +    public fun get_or_add_validator_index_by_staking_pool_id_mut(
-         self: &mut Storage, 
++        self: &mut Storage, 
          system_state: &mut SuiSystemState,
          staking_pool_id: ID,
-@@ -593,7 +601,7 @@ module liquid_staking::storage {
+         ctx: &mut TxContext,
+@@ -620,7 +627,7 @@ module liquid_staking::storage {
      }
  
      /// copied directly from staking_pool.move
