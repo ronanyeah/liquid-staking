@@ -34,6 +34,7 @@ jobs:
       - name: Submit Jobs to Certora Prover (Part I)
         uses: Certora/certora-run-action@v2
         with:
+          cli-version: "8.10.1"
           cli-release: beta
           ecosystem: sui
           working-directory: certora/spec/
@@ -52,6 +53,7 @@ jobs:
       - name: Submit Jobs to Certora Prover (Part II)
         uses: Certora/certora-run-action@v2
         with:
+          cli-version: "8.10.1"
           cli-release: beta
           ecosystem: sui
           working-directory: certora/spec/
