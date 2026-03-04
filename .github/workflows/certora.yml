@@ -60,6 +60,7 @@ jobs:
           configurations: |-
             confs/no_arbitrage.conf
             confs/solvency.conf
+            confs/solvency_monotonicity.conf
             confs/validators_consistency_p1.conf
             confs/validators_consistency_p2.conf
             confs/validators_integrity.conf
